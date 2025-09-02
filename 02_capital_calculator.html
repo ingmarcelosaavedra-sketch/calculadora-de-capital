@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Crecimiento de Capital</title>
+    <!-- Incluye el CDN de Tailwind CSS para un diseño moderno y responsive -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            color: #1f2937;
+        }
+        .container {
+            max-width: 900px;
+        }
+        .input-group {
+            @apply flex flex-col mb-4;
+        }
+        .input-group label {
+            @apply text-sm font-medium text-gray-700 mb-1;
+        }
+        .input-group input {
+            @apply w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500;
+        }
+        .button {
+            @apply py-2 px-4 rounded-md shadow-md font-semibold focus:outline-none focus:ring-2 focus:ring-offset-2;
+        }
+        .btn-blue {
+            @apply bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500;
+        }
+        .radio-label {
+            @apply flex items-center cursor-pointer;
+        }
+        .radio-label input[type="radio"] {
+            @apply h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500;
+        }
+        .progress-bar-container {
+            @apply w-full bg-gray-200 rounded-full h-4 overflow-hidden;
+        }
+        .progress-bar {
+            @apply h-4 bg-green-500 rounded-full transition-all duration-500 ease-in-out;
+        }
+        .table-container {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        table {
+            @apply min-w-full divide-y divide-gray-200;
+        }
+        thead {
+            @apply bg-gray-50;
+        }
+        th, td {
+            @apply px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider;
+        }
+        tbody tr:nth-child(odd) {
+            @apply bg-white;
+        }
+        tbody tr:nth-child(even) {
+            @apply bg-gray-50;
+        }
+        #chartCanvas {
+            width: 100%;
+            height: 300px;
+        }
+    </style>
+    <!-- Enlace al archivo de manifiesto de la PWA -->
+    <link rel="manifest" href="manifest.json">
+</head>
+<body class="p-4 sm:p-8">
+
+    <div class="container mx-auto bg-white p-6 md:p-10 rounded-xl shadow-2xl">
+        <h1 class="text-3xl font-bold text-center mb-6">Calculadora de Crecimiento de Capital</h1>
+        <p class="text-center text-gray-600 mb-8">
+            Simula el crecimiento de tu capital con intereses compuestos. Puedes calcular el crecimiento a lo largo de un tiempo definido o el tiempo necesario para alcanzar una meta de ahorro específica.
+        </p>
+
+        <!-- Controles de la Aplicación -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <!-- Columna de Entradas -->
+            <div>
+                <div class="input-group">
+                    <label for="initialCapital">Capital Inicial (R$):</label>
+                    <input type="number" id="initialCapital" value="1000" min="0">
+                </div>
+                <div class="input-group">
+                    <label for="monthlyContribution">Aporte Mensual (R$):</label>
+                    <input type="number" id="monthlyContribution" value="100" min="0">
+                </div>
+                <div class="input-group">
+                    <label for="annualInterestRate">Tasa de Interés Anual (%):</label>
+                    <input type="number" id="annualInterestRate" value="5" min="0">
+                </div>
+                <div class="input-group">
+                    <label for="monthlyInterestRate">Tasa de Interés Mensual (%):</label>
+                    <input type="number" id="monthlyInterestRate" value="0.4167" min="0">
+                </div>
+            </div>
+
+            <!-- Columna de Opciones y Controles -->
+            <div>
+                <div class="mb-6">
+                    <h3 class="text-lg font-semibold mb-2">Modo de Cálculo</h3>
+                    <div class="flex space-x-4">
+                        <label class="radio-label">
+                            <input type="radio" id="modeTime" name="calculationMode" value="time" checked>
+                            <span class="ml-2">Calcular por Tiempo</span>
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" id="modeGoal" name="calculationMode" value="goal">
+                            <span class="ml-2">Calcular por Meta</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div id="timeInputs" class="input-group">
+                    <label>Tiempo del Plan</label>
+                    <div class="flex items-center space-x-4">
+                        <input type="number" id="planDuration" value="10" min="0" class="flex-1">
+                        <select id="durationUnit" class="px-2 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            <option value="years">Años</option>
+                            <option value="months">Meses</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="goalInput" class="input-group hidden">
+                    <label for="savingsGoal">Meta de Ahorro (R$):</label>
+                    <input type="number" id="savingsGoal" value="50000" min="0">
+                </div>
+            </div>
+        </div>
+
+        <!-- Sección de Resultados -->
+        <div class="bg-gray-50 p-6 rounded-lg shadow-inner mb-8">
+            <h2 class="text-2xl font-semibold mb-4 text-center">Resultados de la Proyección</h2>
+
+            <!-- Resumen de Resultados -->
+            <div id="resultsSummary" class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center mb-6">
+                <div>
+                    <p class="text-gray-500 text-sm">Capital Final</p>
+                    <p id="finalCapital" class="text-xl sm:text-2xl font-bold text-blue-600">R$0.00</p>
+                </div>
+                <div>
+                    <p class="text-gray-500 text-sm">Intereses Generados</p>
+                    <p id="totalInterest" class="text-xl sm:text-2xl font-bold text-green-600">R$0.00</p>
+                </div>
+                <div>
+                    <p class="text-gray-500 text-sm">Aportes Totales</p>
+                    <p id="totalContributions" class="text-xl sm:text-2xl font-bold text-gray-800">R$0.00</p>
+                </div>
+            </div>
+
+            <!-- Indicador de Progreso -->
+            <div id="goalProgressSection" class="mb-6 hidden">
+                <p class="text-center text-gray-600 mb-2" id="goalStatus">Progreso hacia la Meta:</p>
+                <div class="progress-bar-container">
+                    <div id="progressBar" class="progress-bar" style="width: 0%;"></div>
+                </div>
+                <p class="text-center text-gray-500 text-sm mt-1" id="progressText">0% completado</p>
+            </div>
+        </div>
+
+        <!-- Gráfico y Tabla -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Gráfico de Crecimiento -->
+            <div>
+                <h3 class="text-xl font-semibold mb-4">Gráfico de Evolución del Capital</h3>
+                <canvas id="chartCanvas" class="bg-gray-50 rounded-lg shadow"></canvas>
+            </div>
+            <!-- Tabla de Resultados -->
+            <div>
+                <h3 class="text-xl font-semibold mb-4">Tabla de Resultados Detallados</h3>
+                <div class="table-container bg-white rounded-lg shadow-md">
+                    <table id="resultsTable">
+                        <thead>
+                            <tr>
+                                <th>Mes</th>
+                                <th>Año</th>
+                                <th>Aporte Mensual</th>
+                                <th>Intereses Mensuales Ganados</th>
+                                <th>Intereses Acumulados</th>
+                                <th>Capital Acumulado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultsTableBody">
+                            <!-- Los resultados se insertarán aquí dinámicamente -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Obtener elementos del DOM
+        const initialCapitalInput = document.getElementById('initialCapital');
+        const monthlyContributionInput = document.getElementById('monthlyContribution');
+        const annualInterestRateInput = document.getElementById('annualInterestRate');
+        const monthlyInterestRateInput = document.getElementById('monthlyInterestRate');
+        const planDurationInput = document.getElementById('planDuration');
+        const durationUnitSelect = document.getElementById('durationUnit');
+        const savingsGoalInput = document.getElementById('savingsGoal');
+        const modeTimeRadio = document.getElementById('modeTime');
+        const modeGoalRadio = document.getElementById('modeGoal');
+        const timeInputsDiv = document.getElementById('timeInputs');
+        const goalInputDiv = document.getElementById('goalInput');
+
+        const finalCapitalSpan = document.getElementById('finalCapital');
+        const totalInterestSpan = document.getElementById('totalInterest');
+        const totalContributionsSpan = document.getElementById('totalContributions');
+        const resultsTableBody = document.getElementById('resultsTableBody');
+        const chartCanvas = document.getElementById('chartCanvas');
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        const goalProgressSection = document.getElementById('goalProgressSection');
+
+        const ctx = chartCanvas.getContext('2d');
+        const chartData = {
+            labels: [],
+            values: [],
+        };
+
+        // Función para formatear un número a moneda (cambiado a R$)
+        const formatCurrency = (number) => {
+            return new Intl.NumberFormat('pt-BR', {
+                style: 'currency',
+                currency: 'BRL'
+            }).format(number);
+        };
+
+        // Función para actualizar las tasas de interés al cambiar una de ellas
+        const updateInterestRates = (source) => {
+            if (source === 'annual' && annualInterestRateInput.value) {
+                const annualRate = parseFloat(annualInterestRateInput.value);
+                monthlyInterestRateInput.value = (annualRate / 12).toFixed(4);
+            } else if (source === 'monthly' && monthlyInterestRateInput.value) {
+                const monthlyRate = parseFloat(monthlyInterestRateInput.value);
+                annualInterestRateInput.value = (monthlyRate * 12).toFixed(2);
+            }
+        };
+
+        // Escuchar los cambios en las tasas
+        annualInterestRateInput.addEventListener('input', () => updateInterestRates('annual'));
+        monthlyInterestRateInput.addEventListener('input', () => updateInterestRates('monthly'));
+
+        // Escuchar los cambios en los modos de cálculo
+        modeTimeRadio.addEventListener('change', () => {
+            timeInputsDiv.classList.remove('hidden');
+            goalInputDiv.classList.add('hidden');
+            goalProgressSection.classList.add('hidden');
+            calculate();
+        });
+
+        modeGoalRadio.addEventListener('change', () => {
+            timeInputsDiv.classList.add('hidden');
+            goalInputDiv.classList.remove('hidden');
+            goalProgressSection.classList.remove('hidden');
+            calculate();
+        });
+
+        // Función principal de cálculo
+        const calculate = () => {
+            // Obtener los valores de entrada, asegurando que sean números
+            let initialCapital = parseFloat(initialCapitalInput.value) || 0;
+            let monthlyContribution = parseFloat(monthlyContributionInput.value) || 0;
+            let monthlyInterestRate = (parseFloat(monthlyInterestRateInput.value) / 100) || 0;
+            let savingsGoal = parseFloat(savingsGoalInput.value) || 0;
+
+            let totalMonths = 0;
+            let results = [];
+            let currentCapital = initialCapital;
+            let totalInterest = 0;
+            let totalContributions = initialCapital;
+
+            // Limpiar resultados anteriores
+            resultsTableBody.innerHTML = '';
+            chartData.labels = [];
+            chartData.values = [];
+
+            if (modeTimeRadio.checked) {
+                // Modo: Calcular por tiempo
+                let durationValue = parseInt(planDurationInput.value) || 0;
+                let durationUnit = durationUnitSelect.value;
+                if (durationUnit === 'years') {
+                    totalMonths = durationValue * 12;
+                } else {
+                    totalMonths = durationValue;
+                }
+                
+                // Si no hay meses, no hay nada que calcular.
+                if (totalMonths <= 0) {
+                    updateDisplay(0, 0, 0, []);
+                    return;
+                }
+                
+                // Llenar datos de la tabla y el gráfico
+                for (let i = 1; i <= totalMonths; i++) {
+                    currentCapital += monthlyContribution;
+                    let generatedThisMonth = currentCapital * monthlyInterestRate;
+                    currentCapital += generatedThisMonth;
+                    totalInterest += generatedThisMonth;
+                    totalContributions += monthlyContribution;
+
+                    results.push({
+                        month: i,
+                        year: Math.ceil(i / 12),
+                        capital: currentCapital,
+                        interest: totalInterest,
+                        contribution: monthlyContribution,
+                        generatedThisMonth: generatedThisMonth
+                    });
+                }
+                updateDisplay(currentCapital, totalInterest, totalContributions, results);
+
+            } else {
+                // Modo: Calcular por meta
+                if (savingsGoal <= initialCapital) {
+                    updateDisplay(initialCapital, 0, initialCapital, []);
+                    return;
+                }
+                
+                // Llenar datos de la tabla y el gráfico
+                while (currentCapital < savingsGoal) {
+                    totalMonths++;
+                    currentCapital += monthlyContribution;
+                    let generatedThisMonth = currentCapital * monthlyInterestRate;
+                    currentCapital += generatedThisMonth;
+                    totalInterest += generatedThisMonth;
+                    totalContributions += monthlyContribution;
+
+                    results.push({
+                        month: totalMonths,
+                        year: Math.ceil(totalMonths / 12),
+                        capital: currentCapital,
+                        interest: totalInterest,
+                        contribution: monthlyContribution,
+                        generatedThisMonth: generatedThisMonth
+                    });
+                    
+                    // Límite de seguridad para evitar bucles infinitos en casos extremos
+                    if (totalMonths > 1200) { // 100 años
+                        break;
+                    }
+                }
+                updateDisplay(currentCapital, totalInterest, totalContributions, results);
+            }
+
+            // Actualizar la tabla
+            updateTable(results);
+            // Actualizar el gráfico
+            updateChart(results);
+        };
+
+        // Función para actualizar el display de resultados
+        const updateDisplay = (finalCapital, totalInterest, totalContributions, results) => {
+            finalCapitalSpan.textContent = formatCurrency(finalCapital);
+            totalInterestSpan.textContent = formatCurrency(totalInterest);
+            totalContributionsSpan.textContent = formatCurrency(totalContributions);
+
+            // Actualizar la barra de progreso si estamos en modo de meta
+            if (modeGoalRadio.checked) {
+                const savingsGoal = parseFloat(savingsGoalInput.value) || 0;
+                const progress = (finalCapital / savingsGoal) * 100;
+                const clampedProgress = Math.min(progress, 100); // No exceder 100%
+                
+                progressBar.style.width = `${clampedProgress}%`;
+                progressText.textContent = `${clampedProgress.toFixed(2)}% completado`;
+                
+                if (finalCapital >= savingsGoal) {
+                    const totalMonths = results.length;
+                    const years = Math.floor(totalMonths / 12);
+                    const months = totalMonths % 12;
+                    let timeString = '';
+                    if (years > 0) timeString += `${years} año${years > 1 ? 's' : ''}`;
+                    if (years > 0 && months > 0) timeString += ' y ';
+                    if (months > 0) timeString += `${months} mes${months > 1 ? 'es' : ''}`;
+                    
+                    goalStatus.textContent = `¡Meta alcanzada en ${timeString || 'menos de un mes'}!`;
+                    progressText.textContent = `Total de ${totalMonths} meses para alcanzar la meta.`;
+                } else {
+                    goalStatus.textContent = `Progreso hacia la Meta:`;
+                }
+            }
+        };
+
+        // Función para actualizar la tabla
+        const updateTable = (results) => {
+            resultsTableBody.innerHTML = '';
+            results.forEach((data, index) => {
+                const row = document.createElement('tr');
+                // Alternar filas para mejor legibilidad
+                row.className = index % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+                row.innerHTML = `
+                    <td>${data.month}</td>
+                    <td>${data.year}</td>
+                    <td>${formatCurrency(data.contribution)}</td>
+                    <td>${formatCurrency(data.generatedThisMonth)}</td>
+                    <td>${formatCurrency(data.interest)}</td>
+                    <td>${formatCurrency(data.capital)}</td>
+                `;
+                resultsTableBody.appendChild(row);
+            });
+        };
+
+        // Función para actualizar el gráfico
+        const updateChart = (results) => {
+            chartData.labels = results.map(data => `Mes ${data.month}`);
+            chartData.values = results.map(data => data.capital);
+
+            const canvasWidth = chartCanvas.width;
+            const canvasHeight = chartCanvas.height;
+            const margin = 30;
+
+            // Limpiar el canvas
+            ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+            if (chartData.values.length === 0) {
+                // Mostrar mensaje si no hay datos
+                ctx.fillStyle = '#6b7280';
+                ctx.textAlign = 'center';
+                ctx.font = '16px "Inter"';
+                ctx.fillText("No hay datos para mostrar", canvasWidth / 2, canvasHeight / 2);
+                return;
+            }
+
+            // Encontrar valores min y max para escalar el gráfico
+            const maxCapital = Math.max(...chartData.values);
+            const minCapital = Math.min(...chartData.values);
+            
+            const rangeCapital = maxCapital - minCapital;
+            
+            // Función de escalado
+            const getX = (index) => margin + (index / (chartData.labels.length - 1)) * (canvasWidth - 2 * margin);
+            const getY = (value) => {
+                if (rangeCapital === 0) return canvasHeight - margin;
+                return canvasHeight - margin - ((value - minCapital) / rangeCapital) * (canvasHeight - 2 * margin);
+            };
+
+            // Dibujar la línea
+            ctx.beginPath();
+            ctx.strokeStyle = '#2563eb';
+            ctx.lineWidth = 2;
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.moveTo(getX(0), getY(chartData.values[0]));
+            chartData.values.forEach((value, index) => {
+                if (index > 0) {
+                    ctx.lineTo(getX(index), getY(value));
+                }
+            });
+            ctx.stroke();
+
+            // Dibujar los puntos
+            ctx.fillStyle = '#2563eb';
+            chartData.values.forEach((value, index) => {
+                ctx.beginPath();
+                ctx.arc(getX(index), getY(value), 3, 0, 2 * Math.PI);
+                ctx.fill();
+            });
+
+            // Dibujar ejes y etiquetas
+            ctx.strokeStyle = '#d1d5db';
+            ctx.lineWidth = 1;
+            ctx.fillStyle = '#6b7280';
+            ctx.font = '10px "Inter"';
+            ctx.textAlign = 'center';
+
+            // Eje Y
+            const yAxisLabels = [minCapital, minCapital + rangeCapital / 2, maxCapital];
+            yAxisLabels.forEach((label) => {
+                ctx.beginPath();
+                ctx.moveTo(margin, getY(label));
+                ctx.lineTo(margin - 5, getY(label));
+                ctx.stroke();
+                ctx.fillText(formatCurrency(label), margin - 10, getY(label) + 4);
+            });
+
+            // Eje X (etiquetas de los años)
+            const yearLabels = new Set();
+            results.forEach(item => {
+                if (item.month % 12 === 0 || item.month === 1) { // Mostrar el primer mes y los de fin de año
+                    yearLabels.add(item.year);
+                }
+            });
+            const uniqueYears = Array.from(yearLabels).sort((a, b) => a - b);
+            
+            uniqueYears.forEach(year => {
+                const index = results.findIndex(res => res.year === year && (res.month % 12 === 0 || res.month === 1));
+                if (index !== -1) {
+                    ctx.fillText(`Año ${year}`, getX(index), canvasHeight - margin + 15);
+                }
+            });
+
+            // Ejes
+            ctx.beginPath();
+            ctx.moveTo(margin, margin);
+            ctx.lineTo(margin, canvasHeight - margin);
+            ctx.lineTo(canvasWidth - margin, canvasHeight - margin);
+            ctx.stroke();
+        };
+
+        // Manejar el redimensionamiento del canvas
+        const resizeCanvas = () => {
+            const container = chartCanvas.parentElement;
+            chartCanvas.width = container.offsetWidth;
+            chartCanvas.height = 300;
+            calculate(); // Recalcular y redibujar al redimensionar
+        };
+
+        window.addEventListener('resize', resizeCanvas);
+
+        // Escuchar los cambios en los inputs para recalcular automáticamente
+        document.querySelectorAll('input[type="number"]').forEach(input => {
+            input.addEventListener('input', calculate);
+        });
+
+        // Escuchar el cambio en el selector de unidad
+        durationUnitSelect.addEventListener('change', calculate);
+
+        // Cargar los valores iniciales y realizar el primer cálculo
+        window.onload = () => {
+            resizeCanvas();
+            calculate();
+        };
+
+        // Registrar el Service Worker para la funcionalidad PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js').then(registration => {
+                    console.log('Service Worker registrado con éxito:', registration);
+                }).catch(error => {
+                    console.error('Fallo en el registro del Service Worker:', error);
+                });
+            });
+        }
+    </script>
+</body>
+</html>
