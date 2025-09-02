@@ -1,7 +1,7 @@
 {
 "name": "Calculadora de Capital",
 "short_name": "Calculadora",
-"start_url": "/capital_calculator.html",
+"start_url": "/calculadora-de-capital/02_capital_calculator.html",
 "display": "standalone",
 "background_color": "#ffffff",
 "theme_color": "#2563eb",
